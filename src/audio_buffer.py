@@ -47,6 +47,7 @@ class CircularAudioBuffer:
         self.total_samples_written = 0
         self.start_time = None
         self.is_recording = False
+        self.last_write_time = time.time()
         
         logger.info(f"CircularAudioBuffer initialized: {capacity_seconds}s capacity, "
                    f"{sample_rate}Hz, {channels} channel(s), {dtype}")
@@ -58,6 +59,7 @@ class CircularAudioBuffer:
             self.total_samples_written = 0
             self.start_time = time.time()
             self.is_recording = True
+            self.last_write_time = time.time()
             
         logger.info("CircularAudioBuffer: Recording session started")
     
@@ -99,10 +101,19 @@ class CircularAudioBuffer:
             # Update position and tracking
             self.write_position = end_position % self.buffer_size
             self.total_samples_written += data_length
+            self.last_write_time = time.time()
             
             logger.debug(f"CircularAudioBuffer: Wrote {data_length} samples, "
                         f"total: {self.total_samples_written}, "
                         f"position: {self.write_position}")
+    
+    def get_time_since_last_write(self) -> float:
+        """Get the time elapsed since the last write operation.
+        
+        Returns:
+            Time in seconds since last write
+        """
+        return time.time() - self.last_write_time
     
     def read_segment(self, start_time_offset: float, duration: float) -> Optional[np.ndarray]:
         """

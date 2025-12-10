@@ -62,6 +62,7 @@ class VolumeSegmenter:
         self.lock = threading.RLock()
         self.current_segment_start = 0.0
         self.last_analysis_time = 0.0
+        self.last_speech_time = 0.0
         self.volume_history = []  # List of (timestamp, rms_volume) tuples
         self.detected_segments = []  # List of SegmentInfo objects
         self.is_analyzing = False
@@ -79,6 +80,7 @@ class VolumeSegmenter:
         with self.lock:
             self.current_segment_start = 0.0
             self.last_analysis_time = 0.0
+            self.last_speech_time = 0.0
             self.volume_history = []
             self.detected_segments = []
             self.is_analyzing = True
@@ -186,6 +188,10 @@ class VolumeSegmenter:
                 # Calculate RMS volume
                 rms_volume = self._calculate_rms(audio_segment)
                 self.volume_history.append((timestamp, rms_volume))
+                
+                # Track last speech time for silence detection
+                if rms_volume >= self.config.silence_threshold:
+                    self.last_speech_time = timestamp
                 
                 if self.verbose:
                     logger.debug(f"Volume analysis: t={timestamp:.1f}s, RMS={rms_volume:.6f}")
@@ -338,6 +344,14 @@ class VolumeSegmenter:
         """Set callback to be called when a new segment is ready."""
         self.segment_ready_callback = callback
         logger.info("VolumeSegmenter: Segment callback set")
+    
+    def get_current_silence_duration(self) -> float:
+        """Get the duration of silence since the last speech.
+        
+        Returns:
+            Duration in seconds
+        """
+        return self.audio_buffer.get_recording_duration() - self.last_speech_time
     
     def get_stats(self) -> dict:
         """Get segmentation statistics."""

@@ -1,2 +1,5 @@
 .env
 /venv
+
+# Test logs
+testing/logs/*.txt

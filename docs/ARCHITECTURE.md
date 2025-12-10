@@ -1,5 +1,7 @@
 # Architecture Documentation
 
+**← [Back to Home](/README.md)**
+
 ## Overview
 
 Rejoice is a modular voice transcription system with real-time streaming capabilities and AI-powered analysis. The codebase follows a clean separation of concerns with distinct modules for recording, transcription, commands, and settings.

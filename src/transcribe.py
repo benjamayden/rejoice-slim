@@ -428,6 +428,22 @@ def record_audio_streaming(device_override: Optional[int] = None, debug: bool = 
             current_time = time.time()
             duration = current_time - start_time
             
+            # Check for audio stall (no data written to buffer for 5 seconds)
+            if audio_buffer.get_time_since_last_write() > 5.0:
+                print("\n⚠️ Audio input stalled. Stopping recording.")
+                debug_log.error("Audio input stalled (no data for 5s)")
+                user_stopped.set()
+                recording_active.clear()
+                break
+
+            # Check for silence timeout
+            if SILENCE_DURATION_SECONDS > 0 and volume_segmenter.get_current_silence_duration() > SILENCE_DURATION_SECONDS:
+                print(f"\n🛑 Auto-stopping after {SILENCE_DURATION_SECONDS}s of silence.")
+                debug_log.info(f"Auto-stopping due to silence ({SILENCE_DURATION_SECONDS}s)")
+                user_stopped.set()
+                recording_active.clear()
+                break
+            
             # Process completed segments
             try:
                 # First, analyze audio to detect new segments

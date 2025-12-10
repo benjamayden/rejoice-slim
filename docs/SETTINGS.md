@@ -1,6 +1,6 @@
 # ⚙️ Settings Guide
 
-**← [Back to Home](README.md)**
+**← [Back to Home](/README.md)**
 
 ## 🎛️ Configuration Menu
 

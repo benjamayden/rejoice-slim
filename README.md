@@ -39,40 +39,24 @@ curl -fsSL https://raw.githubusercontent.com/benjamayden/rejoice-slim/main/setup
 
 ### Basic Usage  
 ```bash
-rec                              # Start recording (creates smart_filename_22102025_000001.md, etc.)
-rec -000001                      # Append to existing transcript by ID
-rec -l                           # Show all transcripts with their IDs
-rec -v 000001                    # View content of transcript by ID (id is the last number on the filename)
-rec -g 000001                    # AI analysis: extract themes, questions, actions
-rec -o                           # Open transcripts folder
-rec -s                           # Configure settings
+rec           # Start recording
+rec -l        # List all transcripts
+rec -v 000001 # View by ID
 ```
 
-### AI-Powered Features
-```bash
-rec -g /path/to/file.md         # Analyze any text file with AI
-rec -g 000042                   # Analyze transcript by ID
-# Extracts: main themes, key questions, action items, narrative threads
-# Uses hierarchical processing for large content (30k+ characters)
-# Generates intelligent filenames and tags automatically
-```
+**See [docs/USAGE.md](docs/USAGE.md) for all commands and AI features**
 
 ---
 
 ## 📚 Documentation
 
-- **[🔧 Installation Guide](INSTALLATION.md)** - Detailed setup options and troubleshooting
-- **[📖 How to Use](USAGE.md)** - Complete user guide with examples  
-- **[⚙️ Settings](SETTINGS.md)** - Configuration options and customization
-- **[📦 Dependencies](DEPENDENCIES.md)** - Package details and security information
-- **[🏗️ Architecture](ARCHITECTURE.md)** - System design and developer guide
+- **[🔧 Installation Guide](docs/INSTALLATION.md)** - Detailed setup options and troubleshooting
+- **[📖 How to Use](docs/USAGE.md)** - Complete user guide with examples  
+- **[⚙️ Settings](docs/SETTINGS.md)** - Configuration options and customization
+- **[📦 Dependencies](docs/DEPENDENCIES.md)** - Package details and security information
+- **[🏗️ Architecture](docs/ARCHITECTURE.md)** - System design and developer guide
+- **[🧪 Testing](docs/TESTING.md)** - Automated test suite and validation
 
 ---
 
-## 🚀 Ready to Start?
-
-1. **Install** following the [Installation Guide](INSTALLATION.md)
-2. **Learn** the basics in [How to Use](USAGE.md)
-3. **Customize** with the [Settings Guide](SETTINGS.md)
-
-**Questions?** Check the documentation links above or create an issue on GitHub.
+**Questions?** Check the [documentation](docs/README.md) or create an issue on GitHub.
