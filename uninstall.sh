@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# --- Local Transcriber Uninstall Script ---
+# --- Rejoice Slim Uninstall Script ---
 
-echo "🗑️  Uninstalling Local Transcriber..."
+echo "🗑️  Uninstalling Rejoice Slim..."
 
 # Get the project directory
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,9 +10,9 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 1. Remove aliases from ~/.zshrc
 echo "🔗 Removing aliases from ~/.zshrc..."
 if [ -f ~/.zshrc ]; then
-    # Create a temporary file without the Local Transcriber Setup section
+    # Create a temporary file without the Rejoice Slim Setup section
     awk '
-    /^# Added by Local Transcriber Setup/ {
+    /^# Added by Rejoice Slim Setup/ {
         in_section = 1
         next
     }
@@ -82,4 +82,4 @@ echo ""
 echo "To reload your shell configuration:"
 echo "  source ~/.zshrc"
 echo ""
-echo "Thank you for using Local Transcriber! 👋"
+echo "Thank you for using Rejoice Slim! 👋"

@@ -404,39 +404,69 @@ def advanced_performance_settings():
         current_target = int(os.getenv('STREAMING_TARGET_SEGMENT_DURATION', '60'))
         current_max = int(os.getenv('STREAMING_MAX_SEGMENT_DURATION', '90'))
         
+        current_empty_threshold = int(os.getenv('EMPTY_SEGMENT_THRESHOLD', '3'))
+        current_min_chars = int(os.getenv('EMPTY_SEGMENT_MIN_CHARS', '10'))
+        
         print(f"\n⚡ Streaming Performance Settings")
         print("─" * 35)
         print(f"Mode: Streaming (active)")
-        print(f"No Speech Detection: {os.getenv('SILENCE_DURATION_SECONDS', '120')} seconds")
+        print(f"Empty Segment Detection: {current_empty_threshold} consecutive segments")
+        print(f"Empty Segment Min Chars: {current_min_chars}")
         print(f"Streaming Buffer: {current_buffer}s ({current_buffer//60}m {current_buffer%60}s)")
         print(f"Streaming Segments: {current_min}s-{current_target}s-{current_max}s (min-target-max)")
         print(f"Streaming Verbose: {'Yes' if current_verbose else 'No'}")
-        print(f"\n1. Change No Speech Detection Duration")
-        print(f"2. Configure Streaming Buffer Size")
-        print(f"3. Configure Streaming Segment Durations")
-        print(f"4. Toggle Streaming Verbose Mode")
-        print(f"5. ← Back to Main Menu")
+        print(f"\n1. Change Empty Segment Detection Threshold")
+        print(f"2. Change Empty Segment Minimum Characters")
+        print(f"3. Configure Streaming Buffer Size")
+        print(f"4. Configure Streaming Segment Durations")
+        print(f"5. Toggle Streaming Verbose Mode")
+        print(f"6. ← Back to Main Menu")
         
         choice = input("\n👉 Choose option (1-5): ").strip()
         
         if choice == "1":
-            current_silence = int(os.getenv('SILENCE_DURATION_SECONDS', '120'))
-            new_silence = input(f"Enter no speech detection duration in seconds (30-300) [current: {current_silence}]: ").strip()
+            print(f"\nCurrent empty segment threshold: {current_empty_threshold} consecutive segments")
+            print("Recommended thresholds:")
+            print("  • 2 - Very sensitive (quick timeout)")
+            print("  • 3 - Balanced (default)")
+            print("  • 5 - Patient (more tolerance)")
+            print("  • 0 - Disabled (manual stop only)")
+            
+            new_threshold = input(f"Enter consecutive empty segments (0-10) [current: {current_empty_threshold}]: ").strip()
             try:
-                silence = int(new_silence) if new_silence else current_silence
-                if 30 <= silence <= 300:
-                    minutes = silence // 60
-                    seconds = silence % 60
-                    time_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
-                    update_env_setting("SILENCE_DURATION_SECONDS", str(silence))
-                    print(f"✅ No speech detection changed to: {silence} seconds ({time_str})")
+                threshold = int(new_threshold) if new_threshold else current_empty_threshold
+                if 0 <= threshold <= 10:
+                    update_env_setting("EMPTY_SEGMENT_THRESHOLD", str(threshold))
+                    if threshold == 0:
+                        print(f"✅ Empty segment detection disabled (manual stop only)")
+                    else:
+                        print(f"✅ Empty segment threshold changed to: {threshold} consecutive segments")
                     print("⚠️ Restart the script to use the new setting")
                 else:
-                    print("❌ Duration must be between 30 and 300 seconds")
+                    print("❌ Threshold must be between 0 and 10")
             except ValueError:
                 print("❌ Please enter a valid number")
         
         elif choice == "2":
+            print(f"\nCurrent minimum characters: {current_min_chars}")
+            print("Recommended values:")
+            print("  • 5  - Very lenient (count short utterances)")
+            print("  • 10 - Balanced (default, ignore noise)")
+            print("  • 20 - Strict (require substantial content)")
+            
+            new_min_chars = input(f"Enter minimum characters for non-empty segment (1-50) [current: {current_min_chars}]: ").strip()
+            try:
+                min_chars = int(new_min_chars) if new_min_chars else current_min_chars
+                if 1 <= min_chars <= 50:
+                    update_env_setting("EMPTY_SEGMENT_MIN_CHARS", str(min_chars))
+                    print(f"✅ Empty segment minimum characters changed to: {min_chars}")
+                    print("⚠️ Restart the script to use the new setting")
+                else:
+                    print("❌ Minimum characters must be between 1 and 50")
+            except ValueError:
+                print("❌ Please enter a valid number")
+        
+        elif choice == "3":
             print(f"\nCurrent buffer size: {current_buffer} seconds ({current_buffer//60}m {current_buffer%60}s)")
             print("Recommended buffer sizes:")
             print("  • 180s (3m)  - Short sessions, low memory")
@@ -454,11 +484,11 @@ def advanced_performance_settings():
                     print(f"✅ Streaming buffer size changed to: {buffer} seconds ({time_str})")
                     print("⚠️ Restart the script to use the new setting")
                 else:
-                    print("❌ Buffer size must be between 60 and 1200 seconds")
+                    print("❌ Buffer size must be between 60 and 1200 seconds (20 minutes)")
             except ValueError:
                 print("❌ Please enter a valid number")
         
-        elif choice == "3":
+        elif choice == "4":
             print(f"\nCurrent segment durations: {current_min}s-{current_target}s-{current_max}s")
             print("Segment duration rules:")
             print("  • Min: Shortest allowed segment (avoid noise)")
@@ -489,11 +519,11 @@ def advanced_performance_settings():
         elif choice == "4":
             new_verbose = input("Enable streaming verbose mode? (y/n): ").lower()
             if new_verbose in ['y', 'n']:
-                update_env_setting("STREAMING_VERBOSE", 'true' if new_verbose == 'y' else 'false')
-                print(f"✅ Streaming verbose mode changed to: {'Yes' if new_verbose == 'y' else 'No'}")
+                update_env_setting("STREAMING_VERBOSE", 'true' if new_setting == 'y' else 'false')
+                print(f"✅ Streaming verbose changed to: {'Yes' if new_setting == 'y' else 'No'}")
                 print("⚠️ Restart the script to use the new setting")
         
-        elif choice == "5":
+        elif choice == "6":
             break
         else:
             print("❌ Invalid choice. Please select 1-5.")
@@ -555,7 +585,7 @@ def command_settings():
                         new_lines = []
                         in_section = False
                         for line in lines:
-                            if line.strip() == "# Added by Local Transcriber Setup":
+                            if line.strip() == "# Added by Rejoice Slim Setup":
                                 in_section = True
                                 continue
                             elif in_section and (line.strip() == "" or line.startswith("#") and not line.startswith("# Added by")):
@@ -565,7 +595,7 @@ def command_settings():
                                 new_lines.append(line)
                         
                         # Add new alias
-                        new_lines.append("\n# Added by Local Transcriber Setup\n")
+                        new_lines.append("\n# Added by Rejoice Slim Setup\n")
                         new_lines.append(f"alias {new_command}='{venv_python} {project_dir}/src/transcribe.py'\n")
                         
                         # Write back to file
@@ -608,7 +638,7 @@ def uninstall_settings():
         choice = input("\n👉 Choose option (1-2): ").strip()
         
         if choice == "1":
-            print("\n⚠️  This will completely remove the Local Transcriber installation.")
+            print("\n⚠️  This will completely remove the Rejoice Slim installation.")
             confirm = input("Are you sure you want to continue? (y/N): ").strip().lower()
             
             if confirm in ['y', 'yes']:
@@ -623,7 +653,7 @@ def uninstall_settings():
                         result = subprocess.run(['bash', uninstall_script], cwd=project_dir)
                         if result.returncode == 0:
                             print("✅ Uninstall completed successfully!")
-                            print("👋 Thank you for using Local Transcriber!")
+                            print("👋 Thank you for using Rejoice Slim!")
                             sys.exit(0)
                         else:
                             print("❌ Uninstall script failed")

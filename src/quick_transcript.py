@@ -72,6 +72,11 @@ class QuickTranscriptAssembler:
         self.segment_order: List[str] = []
         self.is_processing = False
         
+        # Empty segment detection - sliding window approach
+        self.recent_segment_texts = []  # Track last N segment texts
+        self.empty_segment_threshold = int(os.getenv("EMPTY_SEGMENT_THRESHOLD", "3"))
+        self.empty_segment_min_chars = int(os.getenv("EMPTY_SEGMENT_MIN_CHARS", "10"))
+        
         # Processing tracking
         self.session_start_time = None
         self.processing_stats = {
@@ -129,6 +134,7 @@ class QuickTranscriptAssembler:
                 'segments_failed': 0,
                 'total_processing_time': 0.0
             }
+            self.consecutive_empty_count = 0
             
         logger.info(f"QuickTranscriptAssembler: Started session {session_id}")
     
@@ -210,6 +216,9 @@ class QuickTranscriptAssembler:
                     self.segment_completed_callback(self.transcription_segments[segment_id])
                 except Exception as e:
                     logger.error(f"Error in segment completion callback: {e}")
+            
+            # Update empty segment counter
+            self._update_empty_segment_counter(transcription)
             
             logger.debug(f"Completed transcription for {segment_id}: {len(transcription)} chars")
             
@@ -486,6 +495,59 @@ class QuickTranscriptAssembler:
                 stats['completion_percentage'] = 0
             
             return stats
+    
+    def _update_empty_segment_counter(self, transcription: str) -> None:
+        """Update recent segment texts for sliding window analysis.
+        
+        Args:
+            transcription: The transcribed text from the segment
+        """
+        with self.lock:
+            # Add this segment's text to our sliding window
+            self.recent_segment_texts.append(transcription.strip() if transcription else "")
+            
+            # Keep only the last N segments
+            if len(self.recent_segment_texts) > self.empty_segment_threshold:
+                self.recent_segment_texts.pop(0)
+            
+            logger.debug(f"Added segment text (len={len(transcription.strip() if transcription else '')}). Window size: {len(self.recent_segment_texts)}/{self.empty_segment_threshold}")
+    
+    def should_auto_stop(self) -> Tuple[bool, str]:
+        """Check if we should auto-stop based on last N segments combined text.
+        
+        Returns:
+            Tuple of (should_stop, reason_message)
+        """
+        with self.lock:
+            # Need at least N segments to check
+            if len(self.recent_segment_texts) < self.empty_segment_threshold:
+                return False, ""
+            
+            # Combine the last N segments
+            combined_text = " ".join(self.recent_segment_texts).strip()
+            combined_length = len(combined_text)
+            
+            logger.debug(f"Combined last {self.empty_segment_threshold} segments: {combined_length} chars")
+            logger.debug(f"Preview: '{combined_text[:100]}...'") if combined_text else logger.debug("Combined text is empty")
+            
+            # Check if combined text is below threshold
+            if combined_length < self.empty_segment_min_chars:
+                reason = f"Last {self.empty_segment_threshold} segments combined have < {self.empty_segment_min_chars} chars ({combined_length} chars)"
+                logger.info(f"Auto-stop triggered: {reason}")
+                return True, reason
+            
+            return False, ""
+    
+    def get_consecutive_empty_segments(self) -> int:
+        """Get the current count of consecutive empty segments (deprecated).
+        
+        Returns:
+            Number of consecutive empty segments (for backwards compatibility)
+        """
+        with self.lock:
+            # For backwards compatibility, return 0 if we have content, threshold if we should stop
+            should_stop, _ = self.should_auto_stop()
+            return self.empty_segment_threshold if should_stop else 0
 
 class QuickTranscriptDisplay:
     """Helper for displaying real-time transcription progress."""

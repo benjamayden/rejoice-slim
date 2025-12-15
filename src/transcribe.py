@@ -79,8 +79,9 @@ STREAMING_TARGET_SEGMENT_DURATION = int(os.getenv("STREAMING_TARGET_SEGMENT_DURA
 STREAMING_MAX_SEGMENT_DURATION = int(os.getenv("STREAMING_MAX_SEGMENT_DURATION", "90"))  # 90 seconds
 STREAMING_VERBOSE = os.getenv("STREAMING_VERBOSE", "false").lower() == "true"
 
-# Legacy configuration (for compatibility)
-SILENCE_DURATION_SECONDS = int(os.getenv("SILENCE_DURATION_SECONDS", "120"))
+# Empty segment detection configuration
+EMPTY_SEGMENT_THRESHOLD = int(os.getenv("EMPTY_SEGMENT_THRESHOLD", "3"))  # Number of consecutive empty segments
+EMPTY_SEGMENT_MIN_CHARS = int(os.getenv("EMPTY_SEGMENT_MIN_CHARS", "10"))  # Minimum chars to consider non-empty
 
 # Audio device configuration
 DEFAULT_MIC_DEVICE = int(os.getenv("DEFAULT_MIC_DEVICE", "-1"))
@@ -397,6 +398,11 @@ def record_audio_streaming(device_override: Optional[int] = None, debug: bool = 
         
         debug_log.milestone("Recording initialized, starting audio capture")
         
+        # Record start time for display
+        from datetime import datetime
+        start_time = datetime.now()
+        print(f"\n⏱️  Recording started at {start_time.strftime('%H:%M:%S')}")
+        
         # Platform-specific instructions
         if sys.platform == "darwin":  # macOS
             print("🔴 Recording... Press Enter to stop, or Ctrl+C (^C) to cancel.")
@@ -436,13 +442,17 @@ def record_audio_streaming(device_override: Optional[int] = None, debug: bool = 
                 recording_active.clear()
                 break
 
-            # Check for silence timeout
-            if SILENCE_DURATION_SECONDS > 0 and volume_segmenter.get_current_silence_duration() > SILENCE_DURATION_SECONDS:
-                print(f"\n🛑 Auto-stopping after {SILENCE_DURATION_SECONDS}s of silence.")
-                debug_log.info(f"Auto-stopping due to silence ({SILENCE_DURATION_SECONDS}s)")
-                user_stopped.set()
-                recording_active.clear()
-                break
+            # Check for empty segment detection (if enabled) - based on transcription, not volume
+            if EMPTY_SEGMENT_THRESHOLD > 0:
+                # Check if the assembler says we should auto-stop based on recent transcriptions
+                should_stop, stop_reason = assembler.should_auto_stop()
+                
+                if should_stop:
+                    print(f"\n🛑 Auto-stopping: {stop_reason}")
+                    debug_log.detail(f"Auto-stopping: {stop_reason}")
+                    user_stopped.set()
+                    recording_active.clear()
+                    break
             
             # Process completed segments
             try:
@@ -465,6 +475,14 @@ def record_audio_streaming(device_override: Optional[int] = None, debug: bool = 
                             debug_log.detail(f"Processed segment {segments_processed}: {segment_info.duration:.1f}s")
                             if debug:
                                 print(f"\n📦 Processed segment {segments_processed}: {segment_info.duration:.1f}s")
+                                # Show recent transcriptions for context
+                                with assembler.lock:
+                                    if len(assembler.recent_segment_texts) > 0:
+                                        recent = assembler.recent_segment_texts[-3:]  # Last 3
+                                        print(f"📝 Recent segments window ({len(recent)}/{assembler.empty_segment_threshold}):")
+                                        for i, text in enumerate(recent):
+                                            preview = text[:50] + '...' if len(text) > 50 else text
+                                            print(f"   [{i+1}] {len(text)} chars: '{preview}'")
                         else:
                             debug_log.warning(f"Could not extract audio for segment {segments_processed}")
                             if debug:
@@ -494,8 +512,22 @@ def record_audio_streaming(device_override: Optional[int] = None, debug: bool = 
 
         audio_buffer.stop_recording()
         
-        # Get actual recording duration
+        # Get actual recording duration and calculate elapsed time
         recording_duration = audio_buffer.get_recording_duration()
+        end_time = datetime.now()
+        
+        # Calculate elapsed time safely
+        if isinstance(start_time, datetime):
+            elapsed = (end_time - start_time).total_seconds()
+        else:
+            # Fallback if start_time is still a float from time.time()
+            elapsed = time.time() - start_time
+        
+        elapsed_mins = int(elapsed // 60)
+        elapsed_secs = int(elapsed % 60)
+        
+        print(f"\n⏱️  Recording stopped at {end_time.strftime('%H:%M:%S')} (Duration: {elapsed_mins}m {elapsed_secs}s)")
+        
         debug_log.milestone(f"Recording stopped: {recording_duration:.1f}s captured")
         debug_log.detail(f"Total audio duration: {recording_duration:.1f}s")
         
@@ -824,24 +856,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Voice transcription tool')
     parser.add_argument('-s', '--settings', action='store_true', 
                        help='Open settings menu to change configuration')
-    parser.add_argument('--copy', action='store_true', dest='copy',
+    parser.add_argument('-c', '--copy', action='store_true', dest='copy',
                        help='Auto copy transcription to clipboard')
     parser.add_argument('--no-copy', action='store_false', dest='copy',
                        help='Do not copy transcription to clipboard')
-    parser.add_argument('--open', action='store_true', dest='open',
+    parser.add_argument('-p', '--open', action='store_true', dest='open',
                        help='Auto open the transcription file')
     parser.add_argument('--no-open', action='store_false', dest='open',
                        help='Do not open the transcription file')
-    parser.add_argument('--metadata', action='store_true', dest='metadata',
+    parser.add_argument('-m', '--metadata', action='store_true', dest='metadata',
                        help='Auto generate AI summary and tags')
     parser.add_argument('--no-metadata', action='store_false', dest='metadata',
                        help='Do not generate AI summary and tags')
-    parser.add_argument('--device', type=int, 
+    parser.add_argument('-i', '--device', type=int, 
                        help='Override default mic device for this recording')
-    parser.add_argument('--debug', '-d', action='store_true',
+    parser.add_argument('-d', '--debug', action='store_true',
                        help='Enable debug mode with detailed logging to file and console milestones')
-    parser.add_argument('--verbose', action='store_true',
-                       help='(Deprecated: use --debug) Enable debug mode')
+    parser.add_argument('-V', '--verbose', action='store_true',
+                       help='Enable verbose output with real-time audio/transcription info')
     parser.add_argument('id_reference', nargs='?', 
                        help='Reference existing transcript by ID (e.g., -123456)')
     parser.add_argument('-l', '--list', action='store_true',
@@ -850,19 +882,19 @@ if __name__ == "__main__":
                        help='Show content of transcript by ID')
     parser.add_argument('-g', '--genai', type=str, metavar='PATH_OR_ID', dest='summarize',
                        help='AI analysis and tagging of a file by path or transcript ID (e.g., /path/to/file.md or -123)')
-    parser.add_argument('--audio', type=str, metavar='ID', dest='show_audio',
+    parser.add_argument('-a', '--audio', type=str, metavar='ID', dest='show_audio',
                        help='Show audio files associated with transcript by ID')
-    parser.add_argument('--reprocess', type=str, metavar='ID', dest='reprocess',
+    parser.add_argument('-R', '--reprocess', type=str, metavar='ID', dest='reprocess',
                        help='Reprocess all audio files for transcript ID (transcribe + summarize)')
-    parser.add_argument('--reprocess-failed', action='store_true',
+    parser.add_argument('-F', '--reprocess-failed', action='store_true',
                        help='Reprocess all orphaned audio files (audio without transcript)')
-    parser.add_argument('--overwrite', action='store_true',
+    parser.add_argument('-w', '--overwrite', action='store_true',
                        help='Overwrite existing transcript when reprocessing (default: create new)')
     parser.add_argument('-o', '--open-folder', action='store_true',
                        help='Open the transcripts folder in Finder/Explorer')
     parser.add_argument('-r', '--recover', nargs='?', const='latest', 
                        help='Recover session by ID or "latest"')
-    parser.add_argument('-ls', '--list-sessions', action='store_true', 
+    parser.add_argument('-L', '--list-sessions', action='store_true', 
                        help='List recoverable sessions')
     
     # Set defaults to None so we can detect when they're not specified

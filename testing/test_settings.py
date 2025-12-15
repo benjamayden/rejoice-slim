@@ -72,7 +72,8 @@ def test_env_file_operations():
             'AUTO_OPEN': os.getenv('AUTO_OPEN', 'false'),
             'AUTO_METADATA': os.getenv('AUTO_METADATA', 'false'),
             'AUTO_CLEANUP_AUDIO': os.getenv('AUTO_CLEANUP_AUDIO', 'true'),
-            'SILENCE_DURATION_SECONDS': os.getenv('SILENCE_DURATION_SECONDS', '120'),
+            'EMPTY_SEGMENT_THRESHOLD': os.getenv('EMPTY_SEGMENT_THRESHOLD', '3'),
+            'EMPTY_SEGMENT_MIN_CHARS': os.getenv('EMPTY_SEGMENT_MIN_CHARS', '10'),
             'DEFAULT_MIC_DEVICE': os.getenv('DEFAULT_MIC_DEVICE', '-1'),
             'STREAMING_BUFFER_SIZE_SECONDS': os.getenv('STREAMING_BUFFER_SIZE_SECONDS', '300'),
             'STREAMING_MIN_SEGMENT_DURATION': os.getenv('STREAMING_MIN_SEGMENT_DURATION', '30'),
@@ -258,7 +259,8 @@ def test_configuration_validation():
     print_test("Numeric configuration values")
     try:
         numeric_settings = {
-            'SILENCE_DURATION_SECONDS': int(os.getenv('SILENCE_DURATION_SECONDS', '120')),
+            'EMPTY_SEGMENT_THRESHOLD': int(os.getenv('EMPTY_SEGMENT_THRESHOLD', '3')),
+            'EMPTY_SEGMENT_MIN_CHARS': int(os.getenv('EMPTY_SEGMENT_MIN_CHARS', '10')),
             'DEFAULT_MIC_DEVICE': int(os.getenv('DEFAULT_MIC_DEVICE', '-1')),
             'STREAMING_BUFFER_SIZE_SECONDS': int(os.getenv('STREAMING_BUFFER_SIZE_SECONDS', '300')),
             'STREAMING_MIN_SEGMENT_DURATION': int(os.getenv('STREAMING_MIN_SEGMENT_DURATION', '30')),

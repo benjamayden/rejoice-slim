@@ -25,12 +25,22 @@ Run all tests:
 ## Manual Tests to Run
 
 ```bash
-# 1. Test silence auto-stop (NEW FEATURE)
+# 1. Test silent segment auto-stop (NEW FEATURE)
 rec
-# [Stay silent for 2+ minutes]
-# Should auto-stop at 120 seconds
+# [Stay silent for ~2-3 minutes]
+# Should auto-stop after 3 consecutive silent segments
+# Detection is based on volume analysis, not transcription
+# Each segment is 30-60s, so ~90-180s total
 
-# 2. Test stall detection (NEW FEATURE)
+# 2. Test auto-stop resets on speech
+rec
+# [Speak for 10s]
+# [Stay silent for 1 minute]
+# [Speak again for 10s]  ← This resets the counter
+# [Stay silent for 3 minutes]
+# Should auto-stop after the 3 minutes of final silence
+
+# 3. Test stall detection (NEW FEATURE)
 rec
 # [Disconnect mic after starting]
 # Should stop after 5 seconds

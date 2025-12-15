@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# --- Local Transcriber Setup Script ---
+# --- Rejoice Slim Setup Script ---
 
-echo "🚀 Starting the setup for your local transcriber..."
+echo "🚀 Starting the setup for your Rejoice Slim..."
 
 # Check for Homebrew on macOS to install dependencies if needed
 if [[ "$(uname)" == "Darwin" ]] && ! command -v brew &> /dev/null; then
@@ -47,11 +47,13 @@ fi
 # 4. Activate Virtual Environment and Install Dependencies
 source venv/bin/activate
 echo "🐍 Installing Python packages from requirements.txt..."
-pip install -r requirements.txt
+echo "   Please wait..."
+pip install -q --disable-pip-version-check -r requirements.txt
 if [ $? -ne 0 ]; then
     echo "❌ Failed to install Python packages."
     exit 1
 fi
+echo "   ✅ All packages installed successfully"
 
 # 5. Run the interactive Python configuration script
 echo "⚙️ Now running the interactive configuration..."
@@ -68,12 +70,12 @@ if [ -f ".env" ]; then
     COMMAND_NAME=$(grep "^COMMAND_NAME=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'")
     
     if [ -n "$COMMAND_NAME" ]; then
-        # Remove any existing Local Transcriber Setup section from .zshrc
+        # Remove any existing Rejoice Slim Setup section from .zshrc
         if [ -f ~/.zshrc ]; then
             # Create a temporary file without the old setup section
             # This handles both old functions and old aliases
             awk '
-            /^# Added by Local Transcriber Setup/ {
+            /^# Added by Rejoice Slim Setup/ {
                 in_section = 1
                 next
             }
@@ -91,7 +93,7 @@ if [ -f ".env" ]; then
         fi
         
         # Add fresh simple aliases
-        echo -e "\n# Added by Local Transcriber Setup" >> ~/.zshrc
+        echo -e "\n# Added by Rejoice Slim Setup" >> ~/.zshrc
         echo "alias $COMMAND_NAME='$VENV_PYTHON $PROJECT_DIR/src/transcribe.py'" >> ~/.zshrc
         
         echo "✅ Created alias '$COMMAND_NAME' that uses the virtual environment"

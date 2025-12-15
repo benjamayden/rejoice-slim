@@ -28,7 +28,6 @@ class VolumeConfig:
     target_segment_duration: float = 45.0   # Prefer breaks around 45 seconds  
     max_segment_duration: float = 90.0      # Always break by 90 seconds
     volume_drop_threshold: float = 0.7      # 30% volume drop required (70% remaining)
-    silence_threshold: float = 0.02         # Absolute silence level (RMS)
     min_pause_duration: float = 0.5         # Minimum pause length to consider
     analysis_window: float = 1.0            # 1-second RMS calculation windows
     lookback_window: float = 5.0            # Seconds to look back for volume baseline
@@ -62,7 +61,6 @@ class VolumeSegmenter:
         self.lock = threading.RLock()
         self.current_segment_start = 0.0
         self.last_analysis_time = 0.0
-        self.last_speech_time = 0.0
         self.volume_history = []  # List of (timestamp, rms_volume) tuples
         self.detected_segments = []  # List of SegmentInfo objects
         self.is_analyzing = False
@@ -80,7 +78,6 @@ class VolumeSegmenter:
         with self.lock:
             self.current_segment_start = 0.0
             self.last_analysis_time = 0.0
-            self.last_speech_time = 0.0
             self.volume_history = []
             self.detected_segments = []
             self.is_analyzing = True
@@ -189,10 +186,6 @@ class VolumeSegmenter:
                 rms_volume = self._calculate_rms(audio_segment)
                 self.volume_history.append((timestamp, rms_volume))
                 
-                # Track last speech time for silence detection
-                if rms_volume >= self.config.silence_threshold:
-                    self.last_speech_time = timestamp
-                
                 if self.verbose:
                     logger.debug(f"Volume analysis: t={timestamp:.1f}s, RMS={rms_volume:.6f}")
                 
@@ -265,8 +258,7 @@ class VolumeSegmenter:
         silence_end = None
         
         for i, (timestamp, volume) in enumerate(recent_volumes):
-            is_silence = (volume < self.config.silence_threshold or 
-                         volume < baseline_volume * self.config.volume_drop_threshold)
+            is_silence = (volume < baseline_volume * self.config.volume_drop_threshold)
             
             if is_silence and silence_start is None:
                 silence_start = timestamp
@@ -345,13 +337,32 @@ class VolumeSegmenter:
         self.segment_ready_callback = callback
         logger.info("VolumeSegmenter: Segment callback set")
     
-    def get_current_silence_duration(self) -> float:
-        """Get the duration of silence since the last speech.
+    def get_consecutive_silent_segments(self) -> int:
+        """Get count of consecutive segments with very low average volume.
+        
+        This provides real-time silence detection by analyzing completed segments'
+        volume metrics, without waiting for transcription.
         
         Returns:
-            Duration in seconds
+            Number of consecutive silent segments at the end of detected_segments
         """
-        return self.audio_buffer.get_recording_duration() - self.last_speech_time
+        with self.lock:
+            if not self.detected_segments:
+                return 0
+            
+            # Check segments in reverse order (most recent first)
+            consecutive_silent = 0
+            silence_volume_threshold = 0.01  # Very low RMS indicates silence
+            
+            for segment in reversed(self.detected_segments):
+                # Consider segment silent if average volume is very low
+                if segment.avg_volume < silence_volume_threshold:
+                    consecutive_silent += 1
+                else:
+                    # Hit a non-silent segment, stop counting
+                    break
+            
+            return consecutive_silent
     
     def get_stats(self) -> dict:
         """Get segmentation statistics."""
@@ -377,8 +388,7 @@ class VolumeSegmenter:
                     'min_duration': self.config.min_segment_duration,
                     'target_duration': self.config.target_segment_duration,
                     'max_duration': self.config.max_segment_duration,
-                    'volume_drop_threshold': self.config.volume_drop_threshold,
-                    'silence_threshold': self.config.silence_threshold
+                    'volume_drop_threshold': self.config.volume_drop_threshold
                 }
             }
     

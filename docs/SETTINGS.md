@@ -11,6 +11,43 @@ rec -s
 
 This opens an interactive menu to configure all aspects of Rejoice.
 
+### Settings Menu Structure
+
+Navigate with `rec -s`, then choose:
+
+```
+Main Menu:
+1. Recording Settings
+   1. Change save path
+   2. Auto-stop threshold (default: 3 segments)
+   3. Min chars for content (default: 10 chars)
+   4. Auto-cleanup audio files
+   
+2. Transcription Settings
+   1. Change Whisper model
+   2. Change language
+   
+3. Output Settings
+   1. Change output format (md/txt)
+   2. Auto-copy to clipboard
+   3. Auto-open file
+   
+4. AI Settings (requires Ollama)
+   1. Change Ollama model
+   2. Auto-generate metadata
+   3. AI timeout settings
+   
+5. Audio Settings
+   1. Select microphone device
+   
+6. Command Settings
+   1. Change command name
+   
+7. View Current Settings
+8. Reset to Defaults
+9. Exit
+```
+
 ## 📋 Basic Settings
 
 ### 🎤 Recording Command
@@ -115,39 +152,59 @@ Whisper supports 99+ languages including:
 
 ## ⚡ Performance Settings
 
-### Basic Mode Settings
-These are configured automatically for optimal performance:
+### Auto-Stop Detection
+Controls when recording automatically stops due to inactivity:
 
-#### Chunk Duration
-- **Default:** 10 seconds
-- **What it does:** How often you see transcription updates
-- **Shorter (5s):** More frequent updates, higher CPU usage
-- **Longer (15s):** Less frequent updates, lower CPU usage
+#### Empty Segment Threshold
+- **Setting:** `EMPTY_SEGMENT_THRESHOLD`
+- **Default:** 3 segments
+- **What it does:** Auto-stops after this many consecutive empty transcription segments
+- **How it works:** Checks if the last 3 segments combined have meaningful content after each segment is transcribed
+- **Example:** If segments 5, 6, and 7 combined have < 10 characters, recording stops
+- **Change via:** `rec -s` → `1` (Recording Settings) → `2` (Auto-stop threshold)
 
-#### No Speech Detection
-- **Default:** 2 minutes
-- **What it does:** Auto-stop when no speech detected
-- **Shorter (30s):** Stops sooner during pauses
-- **Longer (5min):** Waits longer during long pauses
+#### Minimum Characters for Content
+- **Setting:** `EMPTY_SEGMENT_MIN_CHARS`
+- **Default:** 10 characters
+- **What it does:** Minimum characters in last N segments combined to consider "has content"
+- **Example:** "Hello" (5 chars) across 3 segments = empty, "Hello world" (11 chars) = has content
+- **Change via:** `rec -s` → `1` (Recording Settings) → `3` (Minimum chars for content)
 
-### Detailed Mode Settings
-Full control over performance parameters:
+### Streaming Transcription Settings
+Controls how audio is segmented during recording:
 
-#### Advanced Chunking
-- **Chunk Duration:** 5-30 seconds
-- **Overlap:** How much chunks overlap for continuity
-- **Worker Threads:** Number of parallel transcription workers
-- **Buffer Size:** Audio buffer management
+#### Buffer Size
+- **Setting:** `STREAMING_BUFFER_SIZE_SECONDS`
+- **Default:** 300 seconds (5 minutes)
+- **What it does:** Keeps last 5 minutes of audio in memory for processing
+- **Why:** Allows transcribing recent audio without loading entire recording
+- **Change via:** Edit `.env` file directly (advanced users)
 
-#### Voice Activity Detection
-- **Sensitivity:** How sensitive to detect speech vs silence
-- **Min Speech Duration:** Minimum time to consider as speech
-- **Min Silence Duration:** Minimum silence before considering a pause
+#### Segment Duration Limits
+These control when audio segments are created and transcribed:
 
-#### Memory Management  
-- **Model Caching:** Keep models in memory vs reload each time
-- **Chunk Buffering:** How many chunks to process simultaneously
-- **Output Buffering:** How transcription is accumulated and displayed
+- **Min Duration:** `STREAMING_MIN_SEGMENT_DURATION=30` (30 seconds)
+  - Won't create segments shorter than 30s (prevents tiny fragments)
+  - **Change via:** Edit `.env` file
+  
+- **Target Duration:** `STREAMING_TARGET_SEGMENT_DURATION=60` (60 seconds)
+  - Tries to create segments around 60s when natural pauses occur
+  - **Change via:** Edit `.env` file
+  
+- **Max Duration:** `STREAMING_MAX_SEGMENT_DURATION=90` (90 seconds)
+  - Forces segment creation at 90s even if you're still talking
+  - Prevents segments from getting too large for processing
+  - **Change via:** Edit `.env` file
+
+**How segmentation works:**
+1. Recording captures audio continuously
+2. When you pause speaking (volume drops), creates a segment
+3. If no pause happens for 90s, forces segment creation anyway
+4. Each segment gets transcribed in background
+5. After segment transcription, checks if last 3 segments combined have content
+6. If last 3 segments have < 10 chars combined, auto-stops recording
+
+> **Note:** Segment duration limits are advanced settings. The defaults work well for most use cases.
 
 ## 🎤 Audio Settings
 

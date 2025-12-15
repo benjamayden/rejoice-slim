@@ -4,7 +4,7 @@ import os
 import shutil
 
 def main():
-    print("--- 🎙️ Welcome to the Local Transcriber Setup ---")
+    print("--- 🎙️ Welcome to the Rejoice Slim Setup ---")
     print("Let's configure your settings. Press Enter to accept defaults.\n")
     
     # Check if Ollama is installed
@@ -156,7 +156,8 @@ def main():
         f.write(f"AUTO_COPY={'true' if auto_copy == 'y' else 'false'}\n")
         f.write(f"AUTO_OPEN={'true' if auto_open == 'y' else 'false'}\n")
         f.write(f"AUTO_CLEANUP_AUDIO=true\n")  # Default true for clean workspace
-        f.write(f"SILENCE_DURATION_SECONDS={silence_duration}\n")
+        f.write(f"EMPTY_SEGMENT_THRESHOLD=3\n")  # Auto-stop after 3 consecutive empty segments
+        f.write(f"EMPTY_SEGMENT_MIN_CHARS=10\n")  # Minimum 10 chars to consider non-empty
         f.write(f"DEFAULT_MIC_DEVICE={mic_device}\n")
         
         # Streaming transcription settings (now the default mode)

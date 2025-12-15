@@ -337,26 +337,107 @@ else
 fi
 
 # Test 6.2: Check volume segmenter silence tracking
-print_test "6.2 - Volume segmenter silence duration method"
+print_test "6.2 - Silent segment tracking method"
 if python3 -c "
 import sys; sys.path.insert(0, 'src')
 from audio_buffer import CircularAudioBuffer
 from volume_segmenter import VolumeSegmenter
 buffer = CircularAudioBuffer()
 segmenter = VolumeSegmenter(buffer)
-assert hasattr(segmenter, 'get_current_silence_duration')
+assert hasattr(segmenter, 'get_consecutive_silent_segments')
 " 2>/dev/null; then
-    pass_test "get_current_silence_duration() method exists"
+    pass_test "get_consecutive_silent_segments() method exists"
 else
-    fail_test "Silence tracking missing" "get_current_silence_duration() not found"
+    fail_test "Silent segment tracking missing" "get_consecutive_silent_segments() not found"
 fi
 
-# Test 6.3: Check if SILENCE_DURATION_SECONDS is loaded
-print_test "6.3 - Silence duration configuration"
-if [ -n "$SILENCE_DURATION_SECONDS" ]; then
-    pass_test "SILENCE_DURATION_SECONDS set to: ${SILENCE_DURATION_SECONDS}s"
+# Test 6.3: Check if EMPTY_SEGMENT_THRESHOLD is loaded
+print_test "6.3 - Empty segment threshold configuration"
+if [ -n "$EMPTY_SEGMENT_THRESHOLD" ]; then
+    pass_test "EMPTY_SEGMENT_THRESHOLD set to: ${EMPTY_SEGMENT_THRESHOLD} segments"
 else
-    fail_test "Silence duration not configured" "SILENCE_DURATION_SECONDS missing from .env"
+    fail_test "Empty segment threshold not configured" "EMPTY_SEGMENT_THRESHOLD missing from .env"
+fi
+
+# Test 6.4: Check sliding window detection method exists
+print_test "6.4 - Sliding window auto-stop method"
+if grep -q "def should_auto_stop" src/quick_transcript.py; then
+    pass_test "should_auto_stop() method exists"
+else
+    fail_test "Sliding window detection missing" "should_auto_stop() not found"
+fi
+
+# Test 6.5: Verify recent_segment_texts tracking
+print_test "6.5 - Recent segment texts tracking"
+if grep -q "recent_segment_texts" src/quick_transcript.py; then
+    pass_test "recent_segment_texts list exists"
+else
+    fail_test "Segment text tracking missing" "recent_segment_texts not found"
+fi
+
+# Test 6.6: Check elapsed time display exists
+print_test "6.6 - Elapsed time display in output"
+if grep -q "Recording stopped at" src/transcribe.py && grep -q "Duration:" src/transcribe.py; then
+    pass_test "Elapsed time display exists"
+else
+    fail_test "Time display missing" "Elapsed time output not found"
+fi
+
+# Test 6.7: Verify verbose mode shows segment window
+print_test "6.7 - Verbose segment window output"
+if grep -q "Recent segments window" src/transcribe.py; then
+    pass_test "Verbose segment window output exists"
+else
+    fail_test "Verbose output missing" "Segment window display not found"
+fi
+
+# Test 6.8: Test sliding window logic (functional test)
+print_test "6.8 - Sliding window auto-stop logic"
+if python3 -c "
+import sys; sys.path.insert(0, 'src')
+from quick_transcript import QuickTranscriptAssembler
+from transcript_manager import TranscriptFileManager
+from audio_manager import AudioFileManager
+import tempfile
+import shutil
+
+# Create temp directory and managers
+temp_dir = tempfile.mkdtemp()
+transcript_mgr = TranscriptFileManager(temp_dir, 'md')
+audio_mgr = AudioFileManager(temp_dir)
+assembler = QuickTranscriptAssembler(transcript_mgr, audio_mgr, auto_clipboard=False)
+
+# Start session
+assembler.start_session('test_session')
+
+# Test sliding window logic
+assembler._update_empty_segment_counter('hello world')
+should_stop, _ = assembler.should_auto_stop()
+assert not should_stop, 'Test 1 failed'
+
+assembler._update_empty_segment_counter('')
+should_stop, _ = assembler.should_auto_stop()
+assert not should_stop, 'Test 2 failed'
+
+assembler._update_empty_segment_counter('')
+should_stop, _ = assembler.should_auto_stop()
+assert not should_stop, 'Test 3 failed'
+
+assembler._update_empty_segment_counter('hi')
+should_stop, reason = assembler.should_auto_stop()
+assert should_stop, 'Test 4 failed'
+
+# Test window size
+for i in range(5):
+    assembler._update_empty_segment_counter(f'segment {i}')
+assert len(assembler.recent_segment_texts) == 3, 'Test 5 failed'
+
+shutil.rmtree(temp_dir)
+print('✓ All tests passed')
+" 2>/dev/null; then
+    pass_test "Sliding window auto-stop logic works correctly"
+else
+    fail_test "Sliding window logic test failed" "Functional test did not pass"
 fi
 
 # ============================================================================
